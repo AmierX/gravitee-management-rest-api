@@ -62,6 +62,7 @@ public class SubscriptionServiceTest {
     private static final String APPLICATION_ID = "my-application";
     private static final String PLAN_ID = "my-plan";
     private static final String API_ID = "my-api";
+    private static final String PAGE_ID = "my-page-gcu";
     private static final String USER_ID = "user";
 
     @InjectMocks
@@ -307,6 +308,205 @@ public class SubscriptionServiceTest {
         assertNotNull(subscriptionEntity.getId());
         assertNotNull(subscriptionEntity.getApplication());
         assertNotNull(subscriptionEntity.getCreatedAt());
+    }
+
+    @Test
+    public void shouldCreateWithoutProcess_AcceptedGCU() throws Exception {
+        // Prepare data
+        when(plan.getApi()).thenReturn(API_ID);
+        when(plan.getGeneralConditions()).thenReturn(PAGE_ID);
+        when(plan.getValidation()).thenReturn(PlanValidationType.MANUAL);
+
+        // Stub
+        when(planService.findById(PLAN_ID)).thenReturn(plan);
+        when(applicationService.findById(APPLICATION_ID)).thenReturn(application);
+        when(apiService.findByIdForTemplates(API_ID)).thenReturn(apiModelEntity);
+        when(subscriptionRepository.create(any())).thenAnswer(returnsFirstArg());
+
+        SecurityContextHolder.setContext(new SecurityContext() {
+            @Override
+            public Authentication getAuthentication() {
+                return new Authentication() {
+                    @Override
+                    public Collection<? extends GrantedAuthority> getAuthorities() {
+                        return null;
+                    }
+
+                    @Override
+                    public Object getCredentials() {
+                        return null;
+                    }
+
+                    @Override
+                    public Object getDetails() {
+                        return null;
+                    }
+
+                    @Override
+                    public Object getPrincipal() {
+                        return new UserDetails("tester", "password", Collections.emptyList());
+                    }
+
+                    @Override
+                    public boolean isAuthenticated() {
+                        return false;
+                    }
+
+                    @Override
+                    public void setAuthenticated(boolean isAuthenticated) throws IllegalArgumentException {
+
+                    }
+
+                    @Override
+                    public String getName() {
+                        return null;
+                    }
+                };
+            }
+
+            @Override
+            public void setAuthentication(Authentication authentication) {
+
+            }
+        });
+
+        // Run
+        final NewSubscriptionEntity newSubscriptionEntity = new NewSubscriptionEntity(PLAN_ID, APPLICATION_ID);
+        newSubscriptionEntity.setGeneralConditionsContent("## Some Markdown Content");
+        newSubscriptionEntity.setGeneralConditionsAccepted(true);
+        final SubscriptionEntity subscriptionEntity = subscriptionService.create(newSubscriptionEntity);
+
+        // Verify
+        verify(subscriptionRepository, times(1)).create(any(Subscription.class));
+        verify(subscriptionRepository, never()).update(any(Subscription.class));
+        verify(apiKeyService, never()).generate(any());
+        assertNotNull(subscriptionEntity.getId());
+        assertNotNull(subscriptionEntity.getApplication());
+        assertNotNull(subscriptionEntity.getCreatedAt());
+    }
+
+    @Test(expected = PlanGeneralConditionAcceptedException.class)
+    public void shouldNotCreateWithoutProcess_NotAcceptedGCU() throws Exception {
+        // Prepare data
+        when(plan.getGeneralConditions()).thenReturn(PAGE_ID);
+
+        // Stub
+        when(planService.findById(PLAN_ID)).thenReturn(plan);
+
+        SecurityContextHolder.setContext(new SecurityContext() {
+            @Override
+            public Authentication getAuthentication() {
+                return new Authentication() {
+                    @Override
+                    public Collection<? extends GrantedAuthority> getAuthorities() {
+                        return null;
+                    }
+
+                    @Override
+                    public Object getCredentials() {
+                        return null;
+                    }
+
+                    @Override
+                    public Object getDetails() {
+                        return null;
+                    }
+
+                    @Override
+                    public Object getPrincipal() {
+                        return new UserDetails("tester", "password", Collections.emptyList());
+                    }
+
+                    @Override
+                    public boolean isAuthenticated() {
+                        return false;
+                    }
+
+                    @Override
+                    public void setAuthenticated(boolean isAuthenticated) throws IllegalArgumentException {
+
+                    }
+
+                    @Override
+                    public String getName() {
+                        return null;
+                    }
+                };
+            }
+
+            @Override
+            public void setAuthentication(Authentication authentication) {
+
+            }
+        });
+
+        // Run
+        final NewSubscriptionEntity newSubscriptionEntity = new NewSubscriptionEntity(PLAN_ID, APPLICATION_ID);
+        newSubscriptionEntity.setGeneralConditionsContent("## Some Markdown Content");
+        newSubscriptionEntity.setGeneralConditionsAccepted(false);
+        subscriptionService.create(newSubscriptionEntity);
+    }
+
+    @Test(expected = PlanGeneralConditionAcceptedException.class)
+    public void shouldNotCreateWithoutProcess_AcceptedGCU_WithoutGCUContent() throws Exception {
+        // Prepare data
+        when(plan.getGeneralConditions()).thenReturn(PAGE_ID);
+
+        // Stub
+        when(planService.findById(PLAN_ID)).thenReturn(plan);
+
+        SecurityContextHolder.setContext(new SecurityContext() {
+            @Override
+            public Authentication getAuthentication() {
+                return new Authentication() {
+                    @Override
+                    public Collection<? extends GrantedAuthority> getAuthorities() {
+                        return null;
+                    }
+
+                    @Override
+                    public Object getCredentials() {
+                        return null;
+                    }
+
+                    @Override
+                    public Object getDetails() {
+                        return null;
+                    }
+
+                    @Override
+                    public Object getPrincipal() {
+                        return new UserDetails("tester", "password", Collections.emptyList());
+                    }
+
+                    @Override
+                    public boolean isAuthenticated() {
+                        return false;
+                    }
+
+                    @Override
+                    public void setAuthenticated(boolean isAuthenticated) throws IllegalArgumentException {
+
+                    }
+
+                    @Override
+                    public String getName() {
+                        return null;
+                    }
+                };
+            }
+
+            @Override
+            public void setAuthentication(Authentication authentication) {
+
+            }
+        });
+
+        // Run
+        final NewSubscriptionEntity newSubscriptionEntity = new NewSubscriptionEntity(PLAN_ID, APPLICATION_ID);
+        newSubscriptionEntity.setGeneralConditionsContent("");
+        newSubscriptionEntity.setGeneralConditionsAccepted(true);
+        subscriptionService.create(newSubscriptionEntity);
     }
 
     @Test
@@ -916,6 +1116,23 @@ public class SubscriptionServiceTest {
         verify(notifierService).trigger(eq(ApiHook.SUBSCRIPTION_TRANSFERRED), anyString(), anyMap());
         verify(notifierService).trigger(eq(ApplicationHook.SUBSCRIPTION_TRANSFERRED), nullable(String.class), anyMap());
         verify(subscription).setUpdatedAt(any());
+    }
+
+
+    @Test(expected = TransferNotAllowedException.class)
+    public void shouldNotTransferSubscription_onPlanWithGeneralConditions() throws Exception {
+        final TransferSubscriptionEntity transferSubscription = new TransferSubscriptionEntity();
+        transferSubscription.setId(SUBSCRIPTION_ID);
+        transferSubscription.setPlan(PLAN_ID);
+
+        when(subscription.getPlan()).thenReturn(PLAN_ID);
+        when(subscriptionRepository.findById(SUBSCRIPTION_ID)).thenReturn(Optional.of(subscription));
+        when(planService.findById(PLAN_ID)).thenReturn(plan);
+        when(plan.getStatus()).thenReturn(PlanStatus.PUBLISHED);
+        when(plan.getGeneralConditions()).thenReturn("SOME_PAGE");
+        when(plan.getSecurity()).thenReturn(PlanSecurityType.API_KEY);
+
+        subscriptionService.transfer(transferSubscription, USER_ID);
     }
 
     @Test(expected = PlanRestrictedException.class)

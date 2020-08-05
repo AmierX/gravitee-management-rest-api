@@ -3178,6 +3178,9 @@ components:
         comment_question:
           description: Content of the message sent to a user creating a subscription.
           type: string
+        general_conditions:
+          description: The  page refenrce with general conditions of use for the API.
+          type: string
     Rating:
       required:
         - id
@@ -3912,6 +3915,12 @@ components:
           type: string
         request:
           description: A request message to the api owner why a user want to subscribe
+          type: string
+        general_conditions_accepted:
+          description: Specify if the general conditions have beenaccepted by the API subscriber
+          type: boolean
+        general_conditions_content:
+          description: Markdown content of the general conditions accepted by the API subscriber
           type: string
     TransferOwnershipInput:
       properties:

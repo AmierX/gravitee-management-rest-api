@@ -24,6 +24,8 @@ public class NewSubscriptionEntity {
     private String application;
     private String plan;
     private String request;
+    private String generalConditionsContent;
+    private Boolean generalConditionsAccepted;
 
     public NewSubscriptionEntity() {
     }
@@ -55,5 +57,21 @@ public class NewSubscriptionEntity {
 
     public void setRequest(String request) {
         this.request = request;
+    }
+
+    public String getGeneralConditionsContent() {
+        return generalConditionsContent;
+    }
+
+    public void setGeneralConditionsContent(String generalConditionsContent) {
+        this.generalConditionsContent = generalConditionsContent;
+    }
+
+    public Boolean getGeneralConditionsAccepted() {
+        return generalConditionsAccepted;
+    }
+
+    public void setGeneralConditionsAccepted(Boolean generalConditionsAccepted) {
+        this.generalConditionsAccepted = generalConditionsAccepted;
     }
 }

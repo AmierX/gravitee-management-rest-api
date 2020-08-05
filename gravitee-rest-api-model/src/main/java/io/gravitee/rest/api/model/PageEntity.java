@@ -103,6 +103,7 @@ public class PageEntity implements Indexable {
         this.published = published;
     }
 
+
     public Date getLastModificationDate() {
         return lastModificationDate;
     }

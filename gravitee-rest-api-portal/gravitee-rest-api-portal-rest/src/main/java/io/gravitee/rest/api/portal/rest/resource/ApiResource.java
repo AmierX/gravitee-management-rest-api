@@ -32,6 +32,7 @@ import io.gravitee.rest.api.service.PageService;
 import io.gravitee.rest.api.service.ParameterService;
 import io.gravitee.rest.api.service.PlanService;
 import io.gravitee.rest.api.service.exceptions.ApiNotFoundException;
+import org.jetbrains.annotations.NotNull;
 
 import javax.inject.Inject;
 import javax.ws.rs.*;
@@ -73,7 +74,8 @@ public class ApiResource extends AbstractResource {
 
     @GET
     @Produces({ MediaType.APPLICATION_JSON })
-    public Response getApiByApiId(@PathParam("apiId") String apiId, @QueryParam("include") List<String> include) {
+    public Response getApiByApiId(@PathParam("apiId") String apiId,
+                                  @QueryParam("include") List<String> include) {
         String username = getAuthenticatedUserOrNull();
 
         Collection<ApiEntity> userApis = apiService.findPublishedByUser(username);
@@ -94,7 +96,8 @@ public class ApiResource extends AbstractResource {
                 List<Plan> plans = planService.findByApi(apiId).stream()
                         .filter(plan -> PlanStatus.PUBLISHED.equals(plan.getStatus()))
                         .filter(plan -> groupService.isUserAuthorizedToAccessApiData(apiEntity, plan.getExcludedGroups(), username))
-                        .sorted(Comparator.comparingInt(PlanEntity::getOrder)).map(p -> planMapper.convert(p))
+                        .sorted(Comparator.comparingInt(PlanEntity::getOrder))
+                        .map(p -> planMapper.convert(p))
                         .collect(Collectors.toList());
                 api.setPlans(plans);
             }

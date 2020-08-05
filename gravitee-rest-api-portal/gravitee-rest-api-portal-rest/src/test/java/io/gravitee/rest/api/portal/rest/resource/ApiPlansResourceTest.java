@@ -17,6 +17,7 @@ package io.gravitee.rest.api.portal.rest.resource;
 
 import io.gravitee.rest.api.model.*;
 import io.gravitee.rest.api.model.api.ApiEntity;
+import io.gravitee.rest.api.portal.rest.mapper.PlanMapper;
 import io.gravitee.rest.api.portal.rest.model.Error;
 import io.gravitee.rest.api.portal.rest.model.ErrorResponse;
 import io.gravitee.rest.api.portal.rest.model.Plan;
@@ -37,6 +38,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.when;
 
 /**
  * @author Florent CHAMFROY (florent.chamfroy at graviteesource.com)
@@ -80,6 +82,10 @@ public class ApiPlansResourceTest extends AbstractResourceTest {
         planWrongStatus.setStatus(PlanStatus.STAGING);
 
         doReturn(new HashSet<PlanEntity>(Arrays.asList(plan1, plan2, planWrongStatus))).when(planService).findByApi(API);
+
+        PlanMapper pm = new PlanMapper();
+        when(planMapper.convert(any())).thenReturn(pm.convert(plan1)).thenReturn(pm.convert(plan2));
+
     }
 
     @Test
@@ -118,6 +124,48 @@ public class ApiPlansResourceTest extends AbstractResourceTest {
         List<Plan> plans = plansResponse.getData();
         assertNotNull(plans);
         assertEquals(2, plans.size());
+     }
+
+    @Test
+    public void shouldGetApiPlansWithPublicAPI_WithGCU() {
+        PageEntity page = new PageEntity();
+        final String PAGE_ID = "PAGE_ID_CGU";
+        page.setId(PAGE_ID);
+        page.setPublished(true);
+        page.setContent("Some CGU");
+        page.setType(PageType.MARKDOWN.name());
+        doReturn(page).when(pageService).findById(any(), any());
+
+        PlanEntity plan1 = new PlanEntity();
+        plan1.setId("A");
+        plan1.setSecurity(PlanSecurityType.API_KEY);
+        plan1.setValidation(PlanValidationType.AUTO);
+        plan1.setStatus(PlanStatus.PUBLISHED);
+        plan1.setGeneralConditions(PAGE_ID);
+
+        PlanEntity plan2 = new PlanEntity();
+        plan2.setId("B");
+        plan2.setSecurity(PlanSecurityType.KEY_LESS);
+        plan2.setValidation(PlanValidationType.MANUAL);
+        plan2.setStatus(PlanStatus.PUBLISHED);
+        plan2.setGeneralConditions(PAGE_ID);
+
+        PlanMapper pm = new PlanMapper();
+        when(planMapper.convert(any())).thenReturn(pm.convert(plan1)).thenReturn(pm.convert(plan2));
+
+        doReturn(true).when(groupService).isUserAuthorizedToAccessApiData(any(), any(), any());
+
+        final Response response = target(API).path("plans").request().get();
+        assertEquals(OK_200, response.getStatus());
+
+        PlansResponse plansResponse = response.readEntity(PlansResponse.class);
+
+        List<Plan> plans = plansResponse.getData();
+        assertNotNull(plans);
+        assertEquals(2, plans.size());
+        for (Plan plan : plans) {
+            assertEquals(PAGE_ID, plan.getGeneralConditions());
+        }
     }
 
     @Test

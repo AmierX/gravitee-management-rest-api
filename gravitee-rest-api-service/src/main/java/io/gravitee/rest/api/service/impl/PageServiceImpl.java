@@ -132,6 +132,9 @@ public class PageServiceImpl extends TransactionalService implements PageService
     @Autowired
     private ImportConfiguration importConfiguration;
 
+    @Autowired
+    private PlanService planService;
+
     private enum PageSituation {
         ROOT, IN_ROOT, IN_FOLDER_IN_ROOT, IN_FOLDER_IN_FOLDER, SYSTEM_FOLDER, IN_SYSTEM_FOLDER, IN_FOLDER_IN_SYSTEM_FOLDER, TRANSLATION;
     }
@@ -707,6 +710,21 @@ public class PageServiceImpl extends TransactionalService implements PageService
             page.setReferenceType(pageToUpdate.getReferenceType());
 
             onlyOneHomepage(page);
+
+            // if the page is used as general condition for a plan,
+            // we can't unpublish it until the plan is closed
+            if (PageReferenceType.API.equals(pageToUpdate.getReferenceType())) {
+                if (!updatePageEntity.isPublished()) {
+                    Optional<PlanEntity> activePlan = planService.findByApi(pageToUpdate.getReferenceId()).stream()
+                            .filter(plan -> pageToUpdate.getId().equals(plan.getGeneralConditions()))
+                            .filter(plan -> !(PlanStatus.CLOSED.equals(plan.getStatus()) || PlanStatus.STAGING.equals(plan.getStatus())))
+                            .findFirst();
+                    if (activePlan.isPresent()) {
+                        throw new TechnicalManagementException("Unable to unpublish the page. Plan '" + activePlan.get().getName() + "' uses it as General Conditions.");
+                    }
+                }
+            }
+
             // if order change, reorder all pages
             if (page.getOrder() != pageToUpdate.getOrder()) {
                 reorderAndSavePages(page);
@@ -1296,7 +1314,20 @@ public class PageServiceImpl extends TransactionalService implements PageService
                 throw new TechnicalManagementException("Unable to remove the folder. It must be empty before being removed.");
             }
 
+            // if the page is used as general condition for a plan,
+            // we can't remove it until the plan is closed
+            if (page.getReferenceType() != null && page.getReferenceType().equals(PageReferenceType.API)) {
+                Optional<PlanEntity> activePlan = planService.findByApi(page.getReferenceId()).stream()
+                        .filter(plan -> page.getId().equals(plan.getGeneralConditions()))
+                        .filter(plan -> !PlanStatus.CLOSED.equals(plan.getStatus()))
+                        .findFirst();
+                if (activePlan.isPresent()) {
+                    throw new TechnicalManagementException("Unable to remove the page. Plan '" + activePlan.get().getName() + "' uses it as General Conditions.");
+                }
+            }
+
             pageRepository.delete(pageId);
+
             // delete links and translations related to the page
             if (!PageType.LINK.name().equalsIgnoreCase(page.getType()) && !PageType.TRANSLATION.name().equalsIgnoreCase(page.getType())) {
                 this.deleteRelatedPages(pageId);
@@ -1562,7 +1593,6 @@ public class PageServiceImpl extends TransactionalService implements PageService
         page.setPublished(
                 updatePageEntity.isPublished() != null ? updatePageEntity.isPublished() : withUpdatePage.isPublished()
         );
-
         PageSource pageSource = convert(updatePageEntity.getSource());
         page.setSource(
                 pageSource != null ? pageSource : withUpdatePage.getSource()
